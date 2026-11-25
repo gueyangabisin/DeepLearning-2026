@@ -1,0 +1,147 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# ==========================================
+# 1. MENYIAPKAN & MEMUAT DATASET DARI GITHUB
+# ==========================================
+
+url_dataset = "https://raw.githubusercontent.com/gueyangabisin/DeepLearning-2026/main/dataset_harga_rumah.csv"
+
+# ==========================================
+# 2. PENGELOLAAN DATA DENGAN PANDAS
+# ==========================================
+df = pd.read_csv(url_dataset)
+
+# Penyesuaian nama kolom & satuan harga ke juta Rupiah (jika masih dalam Rupiah penuh)
+df = df.rename(columns={
+    'luas_m2': 'luas',
+    'jumlah_kamar': 'kamar',
+    'jarak_pusat_kota_km': 'jarak',
+    'harga_rupiah': 'harga'
+})
+if df['harga'].max() > 1_000_000:
+    df['harga'] = df['harga'] / 1_000_000
+
+print("=== 5 DATA PERTAMA ===")
+print(df.head(), "\n")
+
+print("=== INFORMASI DATASET ===")
+print(df.info(), "\n")
+
+print("=== STATISTIK DESKRIPTIF ===")
+print(df.describe(), "\n")
+
+# ==========================================
+# 3. EKSPLORASI DATA (EDA)
+# ==========================================
+print("=== JUMLAH MISSING VALUE ===")
+print(df.isnull().sum(), "\n")
+
+print("=== MATRIKS KORELASI ===")
+print(df.corr(), "\n")
+
+df.hist(figsize=(8, 6), bins=15, edgecolor='black')
+plt.suptitle('Distribusi Setiap Fitur', y=1.02)
+plt.tight_layout()
+plt.show()
+
+# ==========================================
+# 4. KONVERSI KE NUMPY ARRAY
+# ==========================================
+X = df[['luas', 'kamar', 'jarak']].values
+y = df['harga'].values
+
+print(f"Shape Fitur (X) : {X.shape}")
+print(f"Shape Target (y): {y.shape}\n")
+
+# ==========================================
+# 5. NORMALISASI DATA
+# ==========================================
+scaler = StandardScaler()
+X_norm = scaler.fit_transform(X)
+
+y_min, y_max = y.min(), y.max()
+y_norm = (y - y_min) / (y_max - y_min)
+
+print("=== PERBANDINGAN NORMALISASI FITUR (3 DATA PERTAMA) ===")
+print("Sebelum normalisasi:\n", X[:3])
+print("Setelah normalisasi:\n", np.round(X_norm[:3], 2), "\n")
+
+# ==========================================
+# 6. VISUALISASI HUBUNGAN ANTAR FITUR
+# ==========================================
+fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+# Scatter plot Luas vs Harga
+axes[0].scatter(df['luas'], df['harga'], c='blue', alpha=0.7)
+axes[0].set_xlabel('Luas (m²)')
+axes[0].set_ylabel('Harga (juta)')
+axes[0].set_title('Luas vs Harga')
+axes[0].grid(True, linestyle='--', alpha=0.5)
+
+# Heatmap Korelasi
+sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt='.2f', ax=axes[1])
+axes[1].set_title('Heatmap Korelasi Fitur')
+
+plt.tight_layout()
+plt.show()
+
+# ==========================================
+# 7. KONVERSI KE PYTORCH TENSOR
+# ==========================================
+X_tensor = torch.tensor(X_norm, dtype=torch.float32)
+y_tensor = torch.tensor(y_norm.reshape(-1, 1), dtype=torch.float32)
+
+print(f"Shape X_tensor: {X_tensor.shape}")
+print(f"Shape y_tensor: {y_tensor.shape}")
+print("Contoh X_tensor (3 baris):\n", X_tensor[:3])
+print("Contoh y_tensor (3 baris):\n", y_tensor[:3], "\n")
+
+# ==========================================
+# 8. MODEL REGRESI LINEAR & PREDIKSI (PYTORCH)
+# ==========================================
+torch.manual_seed(42)
+model = nn.Linear(3, 1)
+criterion = nn.MSELoss()
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+loss_history = []
+for epoch in range(100):
+    y_pred = model(X_tensor)
+    loss = criterion(y_pred, y_tensor)
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    loss_history.append(loss.item())
+
+# Visualisasi kurva Loss Training
+plt.figure(figsize=(6, 4))
+plt.plot(range(1, 101), loss_history, color='red', linewidth=2)
+plt.yscale('log')
+plt.xlabel('Epoch')
+plt.ylabel('Loss (MSE)')
+plt.title('Loss Training')
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.show()
+
+# Uji Prediksi Sederhana: Input [100 m², 3 kamar, 2 km]
+model.eval()
+with torch.no_grad():
+    data_baru = np.array([[100, 3, 2]])
+    data_baru_norm = scaler.transform(data_baru)
+    input_tensor = torch.tensor(data_baru_norm, dtype=torch.float32)
+
+    pred_norm = model(input_tensor).item()
+    pred_harga_juta = pred_norm * (y_max - y_min) + y_min
+
+print("=== HASIL PREDIKSI ===")
+print("Input    : [100 m², 3 kamar, 2 km]")
+print(f"Prediksi : Rp {pred_harga_juta:,.2f} juta")
