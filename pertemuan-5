@@ -1,0 +1,173 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import mean_squared_error, r2_score
+
+# ==============================================================================
+# 1. PERSIAPAN DATASET HARGA RUMAH
+# ==============================================================================
+url_dataset = "https://raw.githubusercontent.com/gueyangabisin/DeepLearning-2026/main/dataset_harga_rumah.csv"
+df = pd.read_csv(url_dataset)
+
+# Deteksi otomatis kolom fitur & target (mendukung format GitHub P3/P4 maupun tabel ilustrasi slide)
+if {'luas_m2', 'jumlah_kamar', 'jarak_pusat_kota_km'}.issubset(df.columns):
+    fitur_cols = ['luas_m2', 'jumlah_kamar', 'jarak_pusat_kota_km']
+    target_col = 'harga_rupiah'
+else:
+    fitur_cols = list(df.columns[:3])
+    target_col = df.columns[3]
+
+# Konversi harga ke satuan Juta Rupiah jika masih dalam Rupiah penuh
+if df[target_col].max() > 1_000_000:
+    df['harga_juta'] = df[target_col] / 1_000_000
+else:
+    df['harga_juta'] = df[target_col]
+
+print("=== 5 DATA PERTAMA ===")
+print(df[fitur_cols + ['harga_juta']].head(), "\n")
+
+X = df[fitur_cols].values
+y = df[['harga_juta']].values
+
+# Pembagian data: 70% Train, 15% Validation, 15% Test
+X_train_raw, X_temp_raw, y_train_raw, y_temp_raw = train_test_split(
+    X, y, test_size=0.30, random_state=42
+)
+X_val_raw, X_test_raw, y_val_raw, y_test_raw = train_test_split(
+    X_temp_raw, y_temp_raw, test_size=0.50, random_state=42
+)
+
+# Normalisasi fitur (StandardScaler) dan target (MinMaxScaler)
+scaler_X = StandardScaler()
+X_train = scaler_X.fit_transform(X_train_raw)
+X_val = scaler_X.transform(X_val_raw)
+X_test = scaler_X.transform(X_test_raw)
+
+scaler_y = MinMaxScaler()
+y_train = scaler_y.fit_transform(y_train_raw)
+y_val = scaler_y.transform(y_val_raw)
+y_test = scaler_y.transform(y_test_raw)
+
+# Konversi ke PyTorch Tensor & DataLoader
+train_dataset = TensorDataset(
+    torch.tensor(X_train, dtype=torch.float32),
+    torch.tensor(y_train, dtype=torch.float32)
+)
+train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+
+X_val_t = torch.tensor(X_val, dtype=torch.float32)
+y_val_t = torch.tensor(y_val, dtype=torch.float32)
+X_test_t = torch.tensor(X_test, dtype=torch.float32)
+
+# ==============================================================================
+# 2. DEFINISI ARSITEKTUR MODEL (3 INPUT -> HIDDEN 16 RELU -> OUTPUT 1)
+# ==============================================================================
+class HargaRumahNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(3, 16)   # 3 input -> 16 neuron
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(16, 1)   # output: 1 (harga)
+
+    def forward(self, x):
+        return self.fc2(self.relu(self.fc1(x)))
+
+print("=== ARSITEKTUR MODEL ===")
+print(HargaRumahNet(), "\n")
+
+# ==============================================================================
+# 3. FUNGSI TRAINING & EVALUASI (PERBANDINGAN SGD VS ADAM)
+# ==============================================================================
+def latih_dan_evaluasi(nama_optimizer, lr, epochs=200):
+    torch.manual_seed(42)  # Bobot awal identik agar perbandingan adil
+    model = HargaRumahNet()
+    criterion = nn.MSELoss()
+
+    if nama_optimizer == "SGD":
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    elif nama_optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    train_losses, val_losses = [], []
+
+    for epoch in range(epochs):
+        # Mode Training
+        model.train()
+        total_train_loss = 0.0
+        for batch_X, batch_y in train_loader:
+            y_pred = model(batch_X)
+            loss = criterion(y_pred, batch_y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_train_loss += loss.item() * batch_X.size(0)
+
+        train_losses.append(total_train_loss / len(train_loader.dataset))
+
+        # Mode Validasi
+        model.eval()
+        with torch.no_grad():
+            val_pred = model(X_val_t)
+            val_loss = criterion(val_pred, y_val_t).item()
+            val_losses.append(val_loss)
+
+    # Evaluasi pada Data Test
+    model.eval()
+    with torch.no_grad():
+        y_test_pred_scaled = model(X_test_t).numpy()
+        mse_test = mean_squared_error(y_test, y_test_pred_scaled)
+        rmse_test = np.sqrt(mse_test)
+        r2_test = r2_score(y_test, y_test_pred_scaled)
+
+        # Kembalikan ke satuan Juta Rupiah
+        y_test_pred_juta = scaler_y.inverse_transform(y_test_pred_scaled)
+        rmse_juta = np.sqrt(mean_squared_error(y_test_raw, y_test_pred_juta))
+
+    return {
+        "model": model,
+        "train_losses": train_losses,
+        "val_losses": val_losses,
+        "mse": mse_test,
+        "rmse": rmse_test,
+        "r2": r2_test,
+        "rmse_juta": rmse_juta,
+        "y_pred_juta": y_test_pred_juta
+    }
+
+# Jalankan eksperimen 200 epoch untuk SGD dan Adam
+hasil_sgd = latih_dan_evaluasi("SGD", lr=0.05, epochs=200)
+hasil_adam = latih_dan_evaluasi("Adam", lr=0.01, epochs=200)
+
+# ==============================================================================
+# 4. PELAPORAN HASIL: GRAFIK LOSS, METRIK MSE/RMSE/R², DAN KESIMPULAN
+# ==============================================================================
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True)
+
+# Grafik 1: SGD
+axes[0].plot(range(1, 201), hasil_sgd["train_losses"], label="Train Loss", color="#1f77b4", linewidth=2)
+axes[0].plot(range(1, 201), hasil_sgd["val_losses"], label="Validation Loss", color="#ff7f0e", linewidth=2)
+axes[0].set_title("Kurva Loss - Optimizer SGD (lr=0.05)")
+axes[0].set_xlabel("Epoch")
+axes[0].set_ylabel("Loss (MSE)")
+axes[0].legend()
+axes[0].grid(True, linestyle="--", alpha=0.5)
+
+# Grafik 2: Adam
+axes[1].plot(range(1, 201), hasil_adam["train_losses"], label="Train Loss", color="#1f77b4", linewidth=2)
+axes[1].plot(range(1, 201), hasil_adam["val_losses"], label="Validation Loss", color="#ff7f0e", linewidth=2)
+axes[1].set_title("Kurva Loss - Optimizer Adam (lr=0.01)")
+axes[1].set_xlabel("Epoch")
+axes[1].legend()
+axes[1].grid(True, linestyle="--", alpha=0.5)
+
+plt.tight_layout()
+plt.show()
+
+# Tabel Ring
