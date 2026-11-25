@@ -1,0 +1,468 @@
+import torch
+import torch.nn as nn
+
+
+# ============================================================
+# 1. JUDUL PROGRAM
+# ============================================================
+
+print("=" * 60)
+print("PREDIKSI HARGA RUMAH DENGAN NEURAL NETWORK")
+print("Tensor -> Neural Network -> Forward Pass -> Prediksi")
+print("=" * 60)
+
+
+# ============================================================
+# 2. DATA RUMAH
+# ============================================================
+# Kita mempunyai 3 input/features:
+#
+# Input 1 = Luas rumah
+# Input 2 = Jumlah kamar
+# Input 3 = Jarak ke pusat kota
+#
+# Data rumah:
+# Luas       = 120 m2
+# Kamar      = 3
+# Jarak      = 5 km
+
+
+luas = 120
+kamar = 3
+jarak = 5
+
+
+print("\n[1] DATA RUMAH")
+print("-" * 60)
+
+print("Luas rumah       :", luas, "m2")
+print("Jumlah kamar     :", kamar)
+print("Jarak ke kota    :", jarak, "km")
+
+
+# ============================================================
+# 3. DATA MENJADI TENSOR
+# ============================================================
+# Neural Network membutuhkan data dalam bentuk tensor.
+#
+# Kita membuat tensor:
+#
+# [120, 3, 5]
+#
+# Karena hanya ada 1 rumah dengan 3 fitur,
+# shape tensor menjadi:
+#
+# (1, 3)
+#
+# 1 = jumlah data
+# 3 = jumlah fitur
+
+
+x = torch.tensor(
+    [[luas, kamar, jarak]],
+    dtype=torch.float32
+)
+
+
+print("\n[2] TENSOR INPUT")
+print("-" * 60)
+
+print("Isi Tensor:")
+print(x)
+
+print("\nShape Tensor :", x.shape)
+print("Jumlah dimensi:", x.ndim)
+print("Data type    :", x.dtype)
+
+
+# ============================================================
+# 4. MEMBUAT NEURAL NETWORK
+# ============================================================
+# Kita menggunakan:
+#
+# nn.Linear(3, 1)
+#
+# Artinya:
+#
+# 3 input
+#     ↓
+# 1 neuron output
+#
+# Secara matematis:
+#
+# y = w1*x1 + w2*x2 + w3*x3 + b
+
+
+model = nn.Linear(3, 1)
+
+
+print("\n[3] NEURAL NETWORK")
+print("-" * 60)
+
+print("Model:")
+print(model)
+
+print("\nArti nn.Linear(3, 1):")
+print("3 input  ->  1 neuron output")
+
+
+# ============================================================
+# 5. MELIHAT WEIGHT DAN BIAS
+# ============================================================
+# Setiap neuron mempunyai:
+#
+# Weight = bobot setiap input
+# Bias   = nilai tambahan
+#
+# Rumus:
+#
+# y = w1*x1 + w2*x2 + w3*x3 + b
+
+
+print("\n[4] WEIGHT DAN BIAS")
+print("-" * 60)
+
+print("Weight awal:")
+print(model.weight)
+
+print("\nBias awal:")
+print(model.bias)
+
+
+# ============================================================
+# 6. MEMBERIKAN WEIGHT DAN BIAS CONTOH
+# ============================================================
+# PENTING:
+#
+# Nilai berikut BUKAN hasil training.
+#
+# Nilai sengaja kita tentukan agar mahasiswa dapat
+# melihat proses perhitungan Neural Network dengan jelas.
+#
+# Weight:
+# luas rumah       = 4
+# jumlah kamar     = 30
+# jarak kota       = -10
+#
+# Bias = 100
+#
+# Satuan hasil kita anggap dalam juta rupiah.
+
+
+with torch.no_grad():
+
+    model.weight[:] = torch.tensor(
+        [[4.0, 30.0, -10.0]]
+    )
+
+    model.bias[:] = torch.tensor(
+        [100.0]
+    )
+
+
+print("\nWeight setelah ditentukan:")
+print(model.weight)
+
+print("\nBias setelah ditentukan:")
+print(model.bias)
+
+
+# ============================================================
+# 7. MEMAHAMI MAKNA WEIGHT
+# ============================================================
+# Weight menunjukkan pengaruh masing-masing input.
+#
+# Weight luas = 4
+# Artinya dalam contoh ini:
+# setiap tambahan 1 satuan luas memberikan kontribusi +4
+#
+# Weight kamar = 30
+# kontribusi jumlah kamar = +30
+#
+# Weight jarak = -10
+# semakin jauh dari pusat kota,
+# kontribusinya berkurang.
+
+
+print("\n[5] MAKNA WEIGHT")
+print("-" * 60)
+
+print("Weight luas rumah       = 4")
+print("Weight jumlah kamar     = 30")
+print("Weight jarak kota      = -10")
+
+print("\nWeight positif  -> memberikan kontribusi positif")
+print("Weight negatif  -> memberikan kontribusi negatif")
+
+
+# ============================================================
+# 8. FORWARD PASS
+# ============================================================
+# Sekarang tensor dimasukkan ke Neural Network.
+#
+# Alurnya:
+#
+# Tensor
+#    ↓
+# Neural Network
+#    ↓
+# Perhitungan Weight dan Bias
+#    ↓
+# Output
+#
+# Proses ini disebut:
+#
+# FORWARD PASS
+
+
+print("\n[6] FORWARD PASS")
+print("-" * 60)
+
+print("Input Tensor:")
+print(x)
+
+
+with torch.no_grad():
+
+    output = model(x)
+
+
+print("\nOutput Neural Network:")
+print(output)
+
+
+# ============================================================
+# 9. MELIHAT SHAPE OUTPUT
+# ============================================================
+# Input:
+#
+# shape = (1, 3)
+#
+# Artinya:
+# 1 data rumah
+# 3 fitur
+#
+# Output:
+#
+# shape = (1, 1)
+#
+# Artinya:
+# 1 data rumah
+# 1 hasil prediksi
+
+
+print("\n[7] SHAPE OUTPUT")
+print("-" * 60)
+
+print("Shape input  :", x.shape)
+print("Shape output :", output.shape)
+
+
+# ============================================================
+# 10. MENGAMBIL NILAI PREDIKSI
+# ============================================================
+# output masih berupa Tensor.
+#
+# Kita gunakan .item()
+# untuk mengambil angka dari Tensor.
+
+
+harga_juta = output.item()
+
+
+print("\n[8] HASIL PREDIKSI")
+print("-" * 60)
+
+print("Prediksi harga :", harga_juta, "juta rupiah")
+
+print(
+    f"Prediksi harga rumah = Rp{harga_juta * 1_000_000:,.0f}"
+)
+
+
+# ============================================================
+# 11. MEMBUKTIKAN PERHITUNGAN MANUAL
+# ============================================================
+# Neural Network sebenarnya melakukan operasi matematika.
+#
+# Rumus:
+#
+# y = w1*x1 + w2*x2 + w3*x3 + b
+#
+# Masukkan data:
+#
+# x1 = 120
+# x2 = 3
+# x3 = 5
+#
+# w1 = 4
+# w2 = 30
+# w3 = -10
+# b  = 100
+#
+# Maka:
+#
+# y = (4 x 120) + (30 x 3) + (-10 x 5) + 100
+#
+# y = 480 + 90 - 50 + 100
+#
+# y = 620
+#
+# Jadi prediksi = Rp620 juta
+
+
+w1 = 4
+w2 = 30
+w3 = -10
+b = 100
+
+
+manual = (
+    (w1 * luas)
+    + (w2 * kamar)
+    + (w3 * jarak)
+    + b
+)
+
+
+print("\n[9] PERHITUNGAN MANUAL")
+print("-" * 60)
+
+print("Rumus:")
+print("y = w1*x1 + w2*x2 + w3*x3 + b")
+
+print("\nPerhitungan:")
+print("y = (4 x 120) + (30 x 3) + (-10 x 5) + 100")
+
+print("\nHasil:")
+print("y =", manual, "juta")
+
+
+# ============================================================
+# 12. MEMBANDINGKAN HASIL MANUAL DAN PYTORCH
+# ============================================================
+
+
+print("\n[10] PERBANDINGAN")
+print("-" * 60)
+
+print("Hasil perhitungan manual :", manual, "juta")
+print("Hasil Neural Network     :", harga_juta, "juta")
+
+
+if manual == harga_juta:
+    print("\nHasil sama!")
+    print("Neural Network melakukan perhitungan y = Wx + b.")
+
+
+# ============================================================
+# 13. MELIHAT SELURUH ALUR
+# ============================================================
+
+
+print("\n" + "=" * 60)
+print("ALUR FORWARD PASS")
+print("=" * 60)
+
+print()
+print("DATA RUMAH")
+print("Luas = 120 m2")
+print("Kamar = 3")
+print("Jarak = 5 km")
+
+print()
+print("        ↓")
+
+print()
+print("TENSOR")
+print("[120, 3, 5]")
+
+print()
+print("        ↓")
+
+print()
+print("NEURAL NETWORK")
+print("nn.Linear(3, 1)")
+
+print()
+print("        ↓")
+
+print()
+print("FORWARD PASS")
+print("y = Wx + b")
+
+print()
+print("        ↓")
+
+print()
+print("PREDIKSI")
+print(f"Rp{harga_juta * 1_000_000:,.0f}")
+
+
+# ============================================================
+# 14. KENAPA HASIL INI BELUM BISA DISEBUT MODEL TERLATIH?
+# ============================================================
+# Karena kita belum melakukan:
+#
+# 1. Target
+# 2. Loss
+# 3. Backpropagation
+# 4. Optimizer
+# 5. Training
+#
+# Weight dan Bias tadi kita tentukan sendiri.
+#
+# Pada proses training nanti, model akan belajar
+# menentukan weight dan bias berdasarkan data.
+
+
+print("\n" + "=" * 60)
+print("CATATAN PENTING")
+print("=" * 60)
+
+print()
+print("Contoh ini BELUM melakukan TRAINING.")
+
+print()
+print("Weight dan Bias dibuat secara manual")
+print("untuk mempelajari konsep Forward Pass.")
+
+print()
+print("Materi berikutnya akan membahas:")
+print("1. Prediction")
+print("2. Target")
+print("3. Loss")
+print("4. Backpropagation")
+print("5. Optimizer")
+print("6. Training")
+
+
+# ============================================================
+# 15. PENUTUP
+# ============================================================
+
+print("\n" + "=" * 60)
+print("KESIMPULAN PERTEMUAN 3")
+print("=" * 60)
+
+print()
+print("DATA")
+print("  ↓")
+print("TENSOR")
+print("  ↓")
+print("NEURON")
+print("  ↓")
+print("WEIGHT + BIAS")
+print("  ↓")
+print("FORWARD PASS")
+print("  ↓")
+print("PREDIKSI")
+
+print()
+print("Data dapat direpresentasikan sebagai Tensor.")
+print("Tensor menjadi input Neural Network.")
+print("Neural Network melakukan perhitungan.")
+print("Hasil Forward Pass menjadi prediksi.")
+
+print()
+print("=== SELESAI ===")
