@@ -1,0 +1,94 @@
+import pandas as pd
+import torch
+import torch.nn as nn
+
+# ==========================================
+# 1. DATA DAN MODEL SEDERHANA
+# ==========================================
+url_dataset = "https://raw.githubusercontent.com/gueyangabisin/DeepLearning-2026/main/dataset_harga_rumah.csv"
+df = pd.read_csv(url_dataset)
+
+# Konversi harga dari Rupiah penuh ke satuan juta Rupiah sesuai modul praktikum
+if df['harga_rupiah'].max() > 1_000_000:
+    df['harga_juta'] = df['harga_rupiah'] / 1_000_000
+else:
+    df['harga_juta'] = df['harga_rupiah']
+
+print("=== 3 DATA PERTAMA DARI GITHUB ===")
+print(df[['luas_m2', 'jumlah_kamar', 'jarak_pusat_kota_km', 'harga_juta']].head(3), "\n")
+
+# Inisialisasi model linear sederhana: 3 input -> 1 output
+torch.manual_seed(1)  # Menjaga inisialisasi bobot awal agar z > 0 (ReLU aktif)
+model = nn.Linear(3, 1)
+print("=== ARSITEKTUR MODEL ===")
+print(model, "\n")
+
+# ==========================================
+# 2. FORWARD PASS DAN AKTIVASI
+# ==========================================
+# Ambil 1 data contoh (rumah pertama pada dataset)
+sampel = df.iloc[0]
+luas = float(sampel['luas_m2'])
+kamar = float(sampel['jumlah_kamar'])
+jarak = float(sampel['jarak_pusat_kota_km'])
+harga_target = float(sampel['harga_juta'])
+
+x = torch.tensor([[luas, kamar, jarak]], dtype=torch.float32)  # bentuk [1, 3]
+
+# Forward pass & aktivasi ReLU
+z = model(x)            # output linear
+pred = torch.relu(z)    # aktivasi ReLU: max(0, z)
+
+print("=== FORWARD PASS & AKTIVASI ===")
+print("Nilai z (sebelum aktivasi)    :", z)
+print("Nilai prediksi (setelah ReLU) :", pred, "\n")
+
+# ==========================================
+# 3. PREDIKSI, TARGET, DAN LOSS
+# ==========================================
+target = torch.tensor([[harga_target]], dtype=torch.float32)  # bentuk [1, 1]
+
+criterion = nn.MSELoss()
+loss = criterion(pred, target)
+
+print("=== PREDIKSI, TARGET & LOSS ===")
+print(f"Prediksi        : {pred.item():.4f} juta")
+print(f"Target          : {target.item():.4f} juta")
+print(f"Nilai loss (MSE): {loss.item():.4f}\n")
+
+# ==========================================
+# 4. BACKWARD PASS: MENGHITUNG GRADIENT
+# ==========================================
+model.zero_grad()   # Reset gradient lama
+loss.backward()     # Hitung gradient dengan backpropagation
+
+print("=== BACKWARD PASS (GRADIENT) ===")
+print("Gradient weight (dL/dW):")
+print(model.weight.grad)
+print("Gradient bias (dL/db):")
+print(model.bias.grad, "\n")
+
+# ==========================================
+# 5. UPDATE PARAMETER (SATU LANGKAH)
+# ==========================================
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+print("=== UPDATE PARAMETER (1 STEP SGD) ===")
+print("Weight sebelum update :", model.weight.data.clone())
+print("Bias sebelum update   :", model.bias.data.clone())
+
+optimizer.step()
+
+print("Weight setelah update :", model.weight.data)
+print("Bias setelah update   :", model.bias.data, "\n")
+
+# ==========================================
+# 6. HASIL DAN ANALISIS
+# ==========================================
+print("=== RINGKASAN HASIL (RUMAH PERTAMA) ===")
+print(f"Input Luas (m²)      : {luas}")
+print(f"Input Jumlah Kamar   : {int(kamar)}")
+print(f"Input Jarak Kota (km): {jarak}")
+print(f"Prediksi (juta)      : {pred.item():.2f}")
+print(f"Target (juta)        : {target.item():.2f}")
+print(f"Loss (MSE)           : {loss.item():.2f}")
